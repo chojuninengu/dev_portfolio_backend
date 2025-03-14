@@ -43,6 +43,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(db.clone())
             .route("/projects", web::get().to(get_projects))
+            .route("/projects", web::post().to(create_project)) // Added POST route
             .route("/projects/{id}", web::get().to(get_project))
             .route("/projects/{id}", web::put().to(update_project))
             .route("/projects/{id}", web::delete().to(delete_project))
@@ -76,6 +77,23 @@ async fn get_project(db: Data<Pool<Sqlite>>, path: web::Path<i64>) -> impl Respo
     .await {
         Ok(project) => HttpResponse::Ok().json(project),
         Err(_) => HttpResponse::NotFound().body("Project not found"),
+    }
+}
+
+async fn create_project(db: Data<Pool<Sqlite>>, new_project: web::Json<NewProject>) -> impl Responder {
+    match sqlx::query!(
+        "INSERT INTO projects (title, description, github_url) VALUES (?, ?, ?)",
+        new_project.title,
+        new_project.description,
+        new_project.github_url
+    )
+    .execute(db.get_ref())
+    .await {
+        Ok(_) => HttpResponse::Created().body("Project created"),
+        Err(e) => {
+            eprintln!("Error creating project: {}", e);
+            HttpResponse::InternalServerError().body("Error creating project")
+        }
     }
 }
 
